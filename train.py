@@ -198,11 +198,11 @@ for i in tqdm(range(args.start_iter, args.max_iter)):
     if (i == 0) or ((i + 1) % 500 == 0):
         output = torch.cat([style_images, content_images, img], 2)
         output_name = output_dir / 'output{:d}.jpg'.format(i + 1)
-        save_image(output, str(output_name), args.batch_size)
+        save_image(output, str(output_name), nrow=args.batch_size)
     ############################################################################
 
     if (i + 1) % args.save_model_interval == 0 or (i + 1) == args.max_iter:
-        state_dict = decoder.state_dict()
+        state_dict = network.decoder.state_dict()
         for key in state_dict.keys():
             state_dict[key] = state_dict[key].to(torch.device('cpu'))
         torch.save(state_dict,
