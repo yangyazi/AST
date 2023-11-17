@@ -122,17 +122,17 @@ vgg = nn.Sequential(
     nn.ReLU()  # relu5-4
 )
 
-projection_style = nn.Sequential(
-    nn.Linear(in_features=256, out_features=128),
-    nn.ReLU(),
-    nn.Linear(in_features=128, out_features=128)
-)
-
-projection_content = nn.Sequential(
-    nn.Linear(in_features=512, out_features=256),
-    nn.ReLU(),
-    nn.Linear(in_features=256, out_features=128)
-)
+# projection_style = nn.Sequential(
+#     nn.Linear(in_features=256, out_features=128),
+#     nn.ReLU(),
+#     nn.Linear(in_features=128, out_features=128)
+# )
+#
+# projection_content = nn.Sequential(
+#     nn.Linear(in_features=512, out_features=256),
+#     nn.ReLU(),
+#     nn.Linear(in_features=256, out_features=128)
+# )
 
 
 class MultiDiscriminator(nn.Module):
