@@ -367,6 +367,7 @@ class Net(nn.Module):
         if(start_iter > 0):
             self.transform.load_state_dict(torch.load('transformer_iter_' + str(start_iter) + '.pth'))
             self.decoder.load_state_dict(torch.load('decoder_iter_' + str(start_iter) + '.pth'))
+            self.featureFusion.load_state_dict('featureFusion_iter' + str(start_iter) + '.pth')
         self.mse_loss = nn.MSELoss()
         # fix the encoder
         for name in ['enc_1', 'enc_2', 'enc_3', 'enc_4', 'enc_5']:
