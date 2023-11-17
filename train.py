@@ -133,21 +133,25 @@ style_dataset = FlatFolderDataset(args.style_dir, style_tf)
 
 content_iter = iter(data.DataLoader(
     content_dataset, batch_size=int(args.batch_size / 2),
+    # content_dataset, batch_size=int(args.batch_size),
     sampler=InfiniteSamplerWrapper(content_dataset),
     num_workers=args.n_threads))
 style_iter = iter(data.DataLoader(
     style_dataset, batch_size=int(args.batch_size / 2),
+    # style_dataset, batch_size=int(args.batch_size),
     sampler=InfiniteSamplerWrapper(style_dataset),
     num_workers=args.n_threads))
 
 optimizer = torch.optim.Adam([{'params': network.decoder.parameters()},
-                              {'params': network.transform.parameters()},
-                              {'params': network.proj_style.parameters()},
-                              {'params': network.proj_content.parameters()}], lr=args.lr)
+                              {'params': network.transformer.parameters()},
+                              {'params': network.featureFusion.parameters()}], lr=args.lr)
 optimizer_D = torch.optim.Adam(D.parameters(), lr=args.lr, betas=(0.5, 0.999))
 
 if(args.start_iter > 0):
     optimizer.load_state_dict(torch.load('optimizer_iter_' + str(args.start_iter) + '.pth'))
+    # Load featureFusion parameters
+    network.featureFusion.load_state_dict(
+        torch.load('{:s}/featureFusion_iter_{:d}.pth'.format(args.save_dir, args.start_iter)))
 
 for i in tqdm(range(args.start_iter, args.max_iter)):
     adjust_learning_rate(optimizer, iteration_count=i)
@@ -156,13 +160,14 @@ for i in tqdm(range(args.start_iter, args.max_iter)):
     style_images = next(style_iter).to(device)
 
     ######################################################
-    content_images_ = content_images[1:]
-    content_images_ = torch.cat([content_images_, content_images[0:1]], 0)
-    content_images = torch.cat([content_images, content_images_], 0)
-    style_images = torch.cat([style_images, style_images], 0)
+    # content_images_ = content_images[1:]
+    # content_images_ = torch.cat([content_images_, content_images[0:1]], 0)
+    # content_images = torch.cat([content_images, content_images_], 0)
+    # style_images = torch.cat([style_images, style_images], 0)
     ######################################################
 
-    img, loss_c, loss_s, l_identity1, l_identity2, loss_contrastive_c, loss_contrastive_s = network(content_images, style_images, args.batch_size)
+    # img, loss_c, loss_s, l_identity1, l_identity2, loss_contrastive_c, loss_contrastive_s = network(content_images, style_images, args.batch_size)
+    img, loss_c, loss_s, l_identity1, l_identity2 = network(content_images, style_images, args.batch_size)
 
     # train discriminator
     loss_gan_d = D.compute_loss(style_images, valid) + D.compute_loss(img.detach(), fake)
@@ -173,10 +178,14 @@ for i in tqdm(range(args.start_iter, args.max_iter)):
     # train generator
     loss_c = args.content_weight * loss_c
     loss_s = args.style_weight * loss_s
-    loss_contrastive_c = args.contrastive_weight_c * loss_contrastive_c
-    loss_contrastive_s = args.contrastive_weight_s * loss_contrastive_s
+
+    # loss_contrastive_c = args.contrastive_weight_c * loss_contrastive_c
+    # loss_contrastive_s = args.contrastive_weight_s * loss_contrastive_s
+
+
     loss_gan_g = args.gan_weight * D.compute_loss(img, valid)
-    loss = loss_c + loss_s + l_identity1 * 50 + l_identity2 * 1 + loss_contrastive_c + loss_contrastive_s + loss_gan_g
+    loss = loss_c + loss_s + l_identity1 * 50 + l_identity2 * 1 + loss_gan_g
+    # loss = loss_c + loss_s + l_identity1 * 50 + l_identity2 * 1 + loss_contrastive_c + loss_contrastive_s + loss_gan_g
 
     optimizer.zero_grad()
     loss.backward()
@@ -186,8 +195,8 @@ for i in tqdm(range(args.start_iter, args.max_iter)):
     writer.add_scalar('loss_style', loss_s.item(), i + 1)
     writer.add_scalar('loss_identity1', l_identity1.item(), i + 1)
     writer.add_scalar('loss_identity2', l_identity2.item(), i + 1)
-    writer.add_scalar('loss_contrastive_c', loss_contrastive_c.item(), i + 1)  # attention
-    writer.add_scalar('loss_contrastive_s', loss_contrastive_s.item(), i + 1)  # attention
+    # writer.add_scalar('loss_contrastive_c', loss_contrastive_c.item(), i + 1)  # attention
+    # writer.add_scalar('loss_contrastive_s', loss_contrastive_s.item(), i + 1)  # attention
     writer.add_scalar('loss_gan_g', loss_gan_g.item(), i + 1)  # attention
 
     writer.add_scalar('loss_gan_d', loss_gan_d.item(), i + 1)
@@ -208,7 +217,14 @@ for i in tqdm(range(args.start_iter, args.max_iter)):
         torch.save(state_dict,
                    '{:s}/decoder_iter_{:d}.pth'.format(args.save_dir,
                                                            i + 1))
-        state_dict = network.transform.state_dict()
+        # Save state of featureFusion module
+        state_dict = network.featureFusion.state_dict()
+        for key in state_dict.keys():
+            state_dict[key] = state_dict[key].to(torch.device('cpu'))
+        torch.save(state_dict, '{:s}/featureFusion_iter_{:d}.pth'.format(args.save_dir, i + 1))
+
+        # Save state of transformer module which includes AdaptiveMultiAdaAttN_v2 and AdaptiveMultiAttn_Transformer_v2
+        state_dict = network.transformer.state_dict()
         for key in state_dict.keys():
             state_dict[key] = state_dict[key].to(torch.device('cpu'))
         torch.save(state_dict,
