@@ -30,6 +30,13 @@ def test_transform(size, crop):
 parser = argparse.ArgumentParser()
 
 # Basic options
+parser.add_argument('--content', type=str,
+                    help='File path to the content image')
+parser.add_argument('--style', type=str,
+                    help='File path to the style image, or multiple style \
+                    images separated by commas if you want to do style \
+                    interpolation or spatial control')
+
 # parser.add_argument('--content', type=str, default = 'input/content/1.jpg',
 #                     help='File path to the content image')
 # parser.add_argument('--style', type=str, default = 'input/style/1.jpg',
@@ -38,9 +45,9 @@ parser = argparse.ArgumentParser()
 #                     interpolation or spatial control')
 
 #######
-parser.add_argument('--content_dir', type=str,default = r'E:\00propropropro\pytorch-AdaIN-master\pytorch-AdaIN-master\input\content',
+parser.add_argument('--content_dir', type=str,default = r'E:\00000000000000000\testinput\content1',
                     help='Directory path to a batch of content images')
-parser.add_argument('--style_dir', type=str,default = r'E:\00propropropro\pytorch-AdaIN-master\pytorch-AdaIN-master\input\style',
+parser.add_argument('--style_dir', type=str,default = r'E:\00000000000000000\testinput\style1',
                     help='Directory path to a batch of style images')
 #######
 
@@ -204,22 +211,19 @@ for content_path in content_paths:
 
         with torch.no_grad():
 
+            print(content_path.stem + ' iteration ' + style_path.stem)
+            encoder = {'enc_1': enc_1, 'enc_2': enc_2, 'enc_3': enc_3, 'enc_4': enc_4, 'enc_5': enc_5}
+            style_feats = encode_with_intermediate(style, encoder)
+            content_feats = encode_with_intermediate(content, encoder)
 
-            for x in range(args.steps):
+            content = decoder(featureFusion(transform(
+                content_feats[3], style_feats[3], content_feats[4], style_feats[4],
+                adaptive_get_keys(content_feats, 3, 3),
+                adaptive_get_keys(style_feats, 0, 3),
+                adaptive_get_keys(content_feats, 4, 4),
+                adaptive_get_keys(style_feats, 0, 4))[0], AdaIN(content_feats[3], style_feats[3])))
 
-                print('iteration ' + str(x))
-                encoder = {'enc_1': enc_1, 'enc_2': enc_2, 'enc_3': enc_3, 'enc_4': enc_4, 'enc_5': enc_5}
-                style_feats = encode_with_intermediate(style, encoder)
-                content_feats = encode_with_intermediate(content, encoder)
-
-                content = decoder(featureFusion(transform(
-                    content_feats[3], style_feats[3], content_feats[4], style_feats[4],
-                    adaptive_get_keys(content_feats, 3, 3),
-                    adaptive_get_keys(style_feats, 0, 3),
-                    adaptive_get_keys(content_feats, 4, 4),
-                    adaptive_get_keys(style_feats, 0, 4))[0], AdaIN(content_feats[3], style_feats[3])))
-
-                content.clamp(0, 255)
+            content.clamp(0, 255)
             content = content.cpu()
 
             output_name = output_dir / '{:s}_stylized_{:s}{:s}'.format(
