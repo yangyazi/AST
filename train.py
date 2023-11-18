@@ -153,7 +153,9 @@ if(args.start_iter > 0):
     network.featureFusion.load_state_dict(
         torch.load('{:s}/featureFusion_iter_{:d}.pth'.format(args.save_dir, args.start_iter)))
 
-for i in tqdm(range(args.start_iter, args.max_iter)):
+# 为tqdm创建一个实例
+progress_bar = tqdm(range(args.start_iter, args.max_iter))
+for i in progress_bar:
     adjust_learning_rate(optimizer, iteration_count=i)
     adjust_learning_rate(optimizer_D, iteration_count=i)
     content_images = next(content_iter).to(device)
@@ -208,6 +210,17 @@ for i in tqdm(range(args.start_iter, args.max_iter)):
         output = torch.cat([style_images, content_images, img], 2)
         output_name = output_dir / 'output{:d}.jpg'.format(i + 1)
         save_image(output, str(output_name), nrow=args.batch_size)
+
+    # 使用set_postfix方法在进度条后添加损失值
+    progress_bar.set_postfix({
+        'Content Loss': '{:.4f}'.format(loss_c),
+        'Style Loss': '{:.4f}'.format(loss_s),
+        'Identity1 Loss': '{:.4f}'.format(l_identity1),
+        'Identity2 Loss': '{:.4f}'.format(l_identity2),
+        'GAN G Loss': '{:.4f}'.format(loss_gan_g),
+        'GAN D Loss': '{:.4f}'.format(loss_gan_d)
+    })
+
     ############################################################################
 
     if (i + 1) % args.save_model_interval == 0 or (i + 1) == args.max_iter:
