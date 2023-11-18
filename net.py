@@ -122,17 +122,17 @@ vgg = nn.Sequential(
     nn.ReLU()  # relu5-4
 )
 
-projection_style = nn.Sequential(
-    nn.Linear(in_features=256, out_features=128),
-    nn.ReLU(),
-    nn.Linear(in_features=128, out_features=128)
-)
-
-projection_content = nn.Sequential(
-    nn.Linear(in_features=512, out_features=256),
-    nn.ReLU(),
-    nn.Linear(in_features=256, out_features=128)
-)
+# projection_style = nn.Sequential(
+#     nn.Linear(in_features=256, out_features=128),
+#     nn.ReLU(),
+#     nn.Linear(in_features=128, out_features=128)
+# )
+#
+# projection_content = nn.Sequential(
+#     nn.Linear(in_features=512, out_features=256),
+#     nn.ReLU(),
+#     nn.Linear(in_features=256, out_features=128)
+# )
 
 
 class MultiDiscriminator(nn.Module):
@@ -216,19 +216,271 @@ class MultiDiscriminator(nn.Module):
 #         return self.merge_conv(self.merge_conv_pad(self.sanet4_1(content4_1, style4_1) + self.upsample5_1(self.sanet5_1(content5_1, style5_1))))
 
 
+
+
+
+# class AdaptiveMultiAdaAttN_v2(nn.Module):
+#     def __init__(self, in_planes, out_planes, max_sample=256 * 256, query_planes=None, key_planes=None):
+#         super(AdaptiveMultiAdaAttN_v2, self).__init__()
+#         if key_planes is None:
+#             key_planes = in_planes
+#         self.f = nn.Conv2d(query_planes, key_planes, (1, 1))
+#         self.g = nn.Conv2d(key_planes, key_planes, (1, 1))
+#         self.h = nn.Conv2d(in_planes, out_planes, (1, 1))
+#         self.sm = nn.Softmax(dim=-1)
+#         self.out_conv = nn.Conv2d(in_planes, out_planes, (1, 1))
+#         self.max_sample = max_sample
+#
+#     def forward(self, content, style, content_key, style_key, seed=None):
+#         F = self.f(content_key)
+#         G = self.g(style_key)
+#         H = self.h(style)
+#         b, _, h_g, w_g = G.size()
+#         G = G.view(b, -1, w_g * h_g).contiguous()
+#         b, _, h, w = F.size()
+#         F = F.view(b, -1, w * h).permute(0, 2, 1)
+#         S = torch.bmm(F, G)
+#         # S: b, n_c, n_s
+#         S = self.sm(S)
+#
+#         b, style_c, style_h, style_w = H.size()
+#         H = torch.nn.functional.interpolate(H, (h_g, w_g), mode='bicubic')
+#         if h_g * w_g > self.max_sample:
+#             if seed is not None:
+#                 torch.manual_seed(seed)
+#             index = torch.randperm(h_g * w_g).to(content.device)[:self.max_sample]
+#             G = G[:, :, index]
+#             style_flat = H.view(b, -1, h_g * w_g)[:, :, index].transpose(1, 2).contiguous()
+#         else:
+#             style_flat = H.view(b, -1, h_g * w_g).transpose(1, 2).contiguous()
+#
+#         # mean: b, n_c, c
+#         mean = torch.bmm(S, style_flat)
+#         # std: b, n_c, c
+#         std = torch.sqrt(torch.relu(torch.bmm(S, style_flat ** 2) - mean ** 2))
+#         # mean, std: b, c, h, w
+#         _, _, ch, cw = content.size()
+#         # mean = torch.nn.functional.interpolate(mean.view(b, style_h, style_w, style_c).permute(0, 3, 1, 2).contiguous(), (ch, cw))
+#         # std = torch.nn.functional.interpolate(std.view(b, style_h, style_w, style_c).permute(0, 3, 1, 2).contiguous(), (ch, cw))
+#         mean = mean.view(b, h, w, -1).permute(0, 3, 1, 2).contiguous()
+#         std = std.view(b, h, w, -1).permute(0, 3, 1, 2).contiguous()
+#         return std * mean_variance_norm(content) + mean, S
+
+#
+# class AdaptiveMultiAdaAttN_v2(nn.Module):
+#     def __init__(self, in_planes, out_planes, max_sample=256 * 256, query_planes=None, key_planes=None):
+#         super(AdaptiveMultiAdaAttN_v2, self).__init__()
+#         if key_planes is None:
+#             key_planes = in_planes
+#         if query_planes is None:
+#             query_planes = in_planes
+#         self.f = nn.Conv2d(query_planes, key_planes, kernel_size=1, stride=1)
+#         self.g = nn.Conv2d(key_planes, key_planes, kernel_size=1, stride=1)
+#         self.h = nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1)
+#         self.out_conv = nn.Conv2d(out_planes, out_planes, kernel_size=1)
+#         self.gn = nn.GroupNorm(32, out_planes)
+#         self.style_weight_net = nn.Sequential(
+#             nn.Conv2d(2*key_planes, key_planes, kernel_size=1, stride=1),
+#             nn.ReLU(),
+#             nn.Conv2d(key_planes, 1, kernel_size=1),
+#         )
+#         self.merge_weight_generator = nn.Sequential(
+#             nn.Conv2d(in_planes+out_planes, out_planes, kernel_size=1, stride=1),
+#             nn.GroupNorm(32, out_planes),
+#             nn.ReLU(),
+#             nn.Conv2d(out_planes, 1, kernel_size=1),
+#             nn.Sigmoid(),
+#         )
+#         self.max_sample = max_sample
+#
+#     def forward(self, content, style, content_key, style_key, seed=None):
+#         F = self.f(mean_variance_norm(content_key))
+#         G = self.g(mean_variance_norm(style_key))
+#         H = self.h(style)
+#         b, c, h, w = F.size()
+#         F = F.view(b, -1, w * h).permute(0, 2, 1)
+#         G = G.view(b, -1, w * h)
+#         # Using softmax here:
+#         S = torch.softmax(torch.bmm(F, G), dim=-1)
+#         F_perm = F.permute(0, 2, 1)
+#         style_weights = self.style_weight_net(torch.cat([F_perm, G], dim=0))
+#         S *= style_weights
+#         H = H.view(b, -1, w * h)
+#         style_cov = ((H @ H.transpose(-1, -2)) / (H.size(-1) - 1)) - 2
+#         O = torch.bmm(style_cov, S.permute(0, 2, 1))
+#         O = O.view(b, c, h, w)
+#         O = self.out_conv(O)
+#         O = self.gn(O)  # Normalize the result
+#         fusion_weight = self.merge_weight_generator(torch.cat([content, O], dim=1))
+#
+#         return fusion_weight * content + (1 - fusion_weight) * O
+
+
+# class SCT(nn.Module):
+#     def __init__(self, training_mode='art'):
+#         super(SCT, self).__init__()
+#         if training_mode == 'art':
+#             self.cnet = nn.Sequential(nn.Conv2d(512, 256, 1, 1, 0),
+#                                       nn.ReLU(inplace=True),
+#                                       nn.Conv2d(256, 128, 1, 1, 0),
+#                                       nn.ReLU(inplace=True),
+#                                       nn.Conv2d(128, 32, 1, 1, 0))
+#             self.snet = nn.Sequential(nn.Conv2d(512, 256, 3, 1, 0),
+#                                       nn.ReLU(inplace=True),
+#                                       nn.Conv2d(256, 128, 3, 1, 0),
+#                                       nn.ReLU(inplace=True),
+#                                       nn.Conv2d(128, 32, 1, 1, 0))
+#             self.uncompress = nn.Conv2d(32, 512, 1, 1, 0)
+#         else:  # pho
+#             self.cnet = nn.Sequential(nn.Conv2d(256, 128, 1, 1, 0),
+#                                       nn.ReLU(inplace=True),
+#                                       nn.Conv2d(128, 32, 1, 1, 0))
+#             self.snet = nn.Sequential(nn.Conv2d(256, 128, 3, 1, 0),
+#                                       nn.ReLU(inplace=True),
+#                                       nn.Conv2d(128, 32, 1, 1, 0))
+#             self.uncompress = nn.Conv2d(32, 256, 1, 1, 0)
+#
+#     def forward(self, content, style):
+#         cF_nor = nor_mean_std(content)
+#         sF_nor, smean = nor_mean(style)
+#         cF = self.cnet(cF_nor)
+#         sF = self.snet(sF_nor)
+#         b, c, w, h = cF.size()
+#         s_cov = calc_cov(sF)
+#         gF = torch.bmm(s_cov, cF.flatten(2, 3)).view(b, c, w, h)
+#         gF = self.uncompress(gF)
+#         gF = gF + smean.expand(cF_nor.size())
+#         return gF
+#
+#
+# def nor_mean_std(feat):
+#     size = feat.size()
+#     mean, std = calc_mean_std(feat)
+#     nor_feat = (feat - mean.expand(size)) / std.expand(size)
+#     return nor_feat
+#
+# def calc_mean(feat):
+#     size = feat.size()
+#     assert (len(size) == 4)
+#     N, C = size[:2]
+#     feat_mean = feat.view(N, C, -1).mean(dim=2).view(N, C, 1, 1)
+#     return feat_mean
+#
+# def nor_mean(feat):
+#     size = feat.size()
+#     mean = calc_mean(feat)
+#     nor_feat = feat - mean.expand(size)
+#     return nor_feat, mean
+#
+#
+# def calc_cov(feat):
+#     feat = feat.flatten(2, 3)
+#     f_cov = torch.bmm(feat, feat.permute(0, 2, 1)).div(feat.size(2))
+#     return f_cov
+#
+#
+# class AdaptiveMultiAdaAttN_v2(nn.Module):
+#     def __init__(self, in_planes, out_planes, max_sample=256 * 256, query_planes=None, key_planes=None, training_mode='art'):
+#         super(AdaptiveMultiAdaAttN_v2, self).__init__()
+#         training_mode == 'art'
+#         self.f = nn.Conv2d(query_planes, key_planes, (1, 1))
+#         self.g = nn.Conv2d(key_planes, key_planes, (1, 1))
+#         self.h = nn.Conv2d(in_planes, out_planes, (1, 1))
+#         self.sm = nn.Softmax(dim=-1)
+#         self.out_conv = nn.Conv2d(in_planes, out_planes, (1, 1))
+#         self.sct = SCT(training_mode=training_mode)
+#         self.max_sample = max_sample
+#
+#     def forward(self, content, style, content_key, style_key, seed=None):
+#         # use SCT to get global style transfer
+#         global_style_transfer = self.sct(content, style)
+#         # normalize the global style transferred content
+#         normalized_global = nor_mean_std(global_style_transfer)
+#
+#         F = self.f(content_key)
+#         G = self.g(style_key)
+#         H = self.h(style)
+#         b, _, h_g, w_g = G.size()
+#         G = G.view(b, -1, w_g * h_g).contiguous()
+#         b, _, h, w = F.size()
+#         F = F.view(b, -1, w * h).permute(0, 2, 1)
+#         S = torch.bmm(F, G)
+#         S = self.sm(S)
+#
+#         b, style_c, style_h, style_w = H.size()
+#         H = torch.nn.functional.interpolate(H, (h_g, w_g), mode='bicubic')
+#         if h_g * w_g > self.max_sample:
+#             if seed is not None:
+#                 torch.manual_seed(seed)
+#             index = torch.randperm(h_g * w_g).to(content.device)[:self.max_sample]
+#             G = G[:, :, index]
+#             style_flat = H.view(b, -1, h_g * w_g)[:, :, index].transpose(1, 2).contiguous()
+#         else:
+#             style_flat = H.view(b, -1, h_g * w_g).transpose(1, 2).contiguous()
+#
+#         mean = torch.bmm(S, style_flat)
+#         std = torch.sqrt(torch.relu(torch.bmm(S, style_flat ** 2) - mean ** 2))
+#         _, _, ch, cw = content.size()
+#         mean = mean.view(b, h, w, -1).permute(0, 3, 1, 2).contiguous()
+#         std = std.view(b, h, w, -1).permute(0, 3, 1, 2).contiguous()
+#         local_style_transfer = std * mean_variance_norm(normalized_global) + mean
+#         return local_style_transfer, S
+#
+
+
+
+
+
+def nor_mean_std(feat):
+    size = feat.size()
+    mean, std = calc_mean_std(feat)
+    nor_feat = (feat - mean.expand(size)) / std.expand(size)
+    return nor_feat
+
+def calc_mean(feat):
+    size = feat.size()
+    assert (len(size) == 4)
+    N, C = size[:2]
+    feat_mean = feat.view(N, C, -1).mean(dim=2).view(N, C, 1, 1)
+    return feat_mean
+
+def nor_mean(feat):
+    size = feat.size()
+    mean = calc_mean(feat)
+    nor_feat = feat - mean.expand(size)
+    return nor_feat, mean
+
+
+def calc_cov(feat):
+    feat = feat.flatten(2, 3)
+    f_cov = torch.bmm(feat, feat.permute(0, 2, 1)).div(feat.size(2))
+    return f_cov
+
+
 class AdaptiveMultiAdaAttN_v2(nn.Module):
-    def __init__(self, in_planes, out_planes, max_sample=256 * 256, query_planes=None, key_planes=None):
+    def __init__(self, in_planes, out_planes, max_sample=256 * 256, query_planes=None, key_planes=None, training_mode='art'):
         super(AdaptiveMultiAdaAttN_v2, self).__init__()
-        if key_planes is None:
-            key_planes = in_planes
+        training_mode == 'art'
         self.f = nn.Conv2d(query_planes, key_planes, (1, 1))
         self.g = nn.Conv2d(key_planes, key_planes, (1, 1))
         self.h = nn.Conv2d(in_planes, out_planes, (1, 1))
         self.sm = nn.Softmax(dim=-1)
         self.out_conv = nn.Conv2d(in_planes, out_planes, (1, 1))
         self.max_sample = max_sample
+        self.cnet = nn.Sequential(nn.Conv2d(512, 256, 1, 1, 0),
+                                  nn.ReLU(inplace=True),
+                                  nn.Conv2d(256, 128, 1, 1, 0),
+                                  nn.ReLU(inplace=True),
+                                  nn.Conv2d(128, 32, 1, 1, 0))
+        self.snet = nn.Sequential(nn.Conv2d(512, 256, 3, 1, 0),
+                                  nn.ReLU(inplace=True),
+                                  nn.Conv2d(256, 128, 3, 1, 0),
+                                  nn.ReLU(inplace=True),
+                                  nn.Conv2d(128, 32, 1, 1, 0))
+        self.uncompress = nn.Conv2d(32, 512, 1, 1, 0)
 
     def forward(self, content, style, content_key, style_key, seed=None):
+
         F = self.f(content_key)
         G = self.g(style_key)
         H = self.h(style)
@@ -237,7 +489,6 @@ class AdaptiveMultiAdaAttN_v2(nn.Module):
         b, _, h, w = F.size()
         F = F.view(b, -1, w * h).permute(0, 2, 1)
         S = torch.bmm(F, G)
-        # S: b, n_c, n_s
         S = self.sm(S)
 
         b, style_c, style_h, style_w = H.size()
@@ -251,17 +502,22 @@ class AdaptiveMultiAdaAttN_v2(nn.Module):
         else:
             style_flat = H.view(b, -1, h_g * w_g).transpose(1, 2).contiguous()
 
-        # mean: b, n_c, c
         mean = torch.bmm(S, style_flat)
-        # std: b, n_c, c
-        std = torch.sqrt(torch.relu(torch.bmm(S, style_flat ** 2) - mean ** 2))
-        # mean, std: b, c, h, w
-        _, _, ch, cw = content.size()
-        # mean = torch.nn.functional.interpolate(mean.view(b, style_h, style_w, style_c).permute(0, 3, 1, 2).contiguous(), (ch, cw))
-        # std = torch.nn.functional.interpolate(std.view(b, style_h, style_w, style_c).permute(0, 3, 1, 2).contiguous(), (ch, cw))
         mean = mean.view(b, h, w, -1).permute(0, 3, 1, 2).contiguous()
-        std = std.view(b, h, w, -1).permute(0, 3, 1, 2).contiguous()
-        return std * mean_variance_norm(content) + mean, S
+        cF_nor = nor_mean_std(content)
+        sF_nor, smean = nor_mean(style)
+        cF = self.cnet(cF_nor)
+        sF = self.snet(sF_nor)
+        b, c, w, h = cF.size()
+        s_cov = calc_cov(sF)
+        gF = torch.bmm(s_cov, cF.flatten(2, 3)).view(b, c, w, h)
+        gF = self.uncompress(gF)
+        gF = gF + mean
+
+
+        return gF, S
+
+
 
 class AdaptiveMultiAttn_Transformer_v2(nn.Module):
     def __init__(self, in_planes, out_planes, query_planes=None, key_planes=None, shallow_layer=False):
@@ -270,6 +526,7 @@ class AdaptiveMultiAttn_Transformer_v2(nn.Module):
                                                       query_planes=query_planes, key_planes=key_planes)
         self.attn_adain_5_1 = AdaptiveMultiAdaAttN_v2(in_planes=in_planes, out_planes=out_planes,
                                                       query_planes=query_planes, key_planes=key_planes + 512)
+
         # self.attn_adain_5_1 = AdaptiveMultiAdaAttN_v2(in_planes=in_planes, out_planes=out_planes, query_planes=query_planes+512, key_planes=key_planes+512)
         self.upsample5_1 = nn.Upsample(scale_factor=2, mode='nearest')
         self.merge_conv_pad = nn.ReflectionPad2d((1, 1, 1, 1))
