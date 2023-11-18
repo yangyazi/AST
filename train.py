@@ -84,12 +84,19 @@ parser.add_argument('--log_dir', default='./logs',
 parser.add_argument('--lr', type=float, default=1e-4)
 parser.add_argument('--lr_decay', type=float, default=5e-5)
 parser.add_argument('--max_iter', type=int, default=160000)
-parser.add_argument('--batch_size', type=int, default=4)
+parser.add_argument('--batch_size', type=int, default=1)
 # parser.add_argument('--batch_size', type=int, default=12)
 parser.add_argument('--style_weight', type=float, default=1.0)
-parser.add_argument('--content_weight', type=float, default=1.0)
-parser.add_argument('--contrastive_weight_c', type=float, default=0.3)
-parser.add_argument('--contrastive_weight_s', type=float, default=0.3)
+
+
+parser.add_argument('--content_transitive_loss_weight', type=float, default=1.0)
+parser.add_argument('--style_transitive_loss_weight', type=float, default=1.0)
+parser.add_argument('--style_diff_loss_weight', type=float, default=1.0)
+parser.add_argument('--content_restoration_loss_weight', type=float, default=1.0)
+parser.add_argument('--style_restoration_loss_weight', type=float, default=1.0)
+
+# parser.add_argument('--contrastive_weight_c', type=float, default=0.3)
+# parser.add_argument('--contrastive_weight_s', type=float, default=0.3)
 parser.add_argument('--gan_weight', type=float, default=5.0)
 parser.add_argument('--n_threads', type=int, default=0)
 # parser.add_argument('--n_threads', type=int, default=16)
@@ -132,13 +139,13 @@ content_dataset = FlatFolderDataset(args.content_dir, content_tf)
 style_dataset = FlatFolderDataset(args.style_dir, style_tf)
 
 content_iter = iter(data.DataLoader(
-    content_dataset, batch_size=int(args.batch_size / 2),
-    # content_dataset, batch_size=int(args.batch_size),
+    # content_dataset, batch_size=int(args.batch_size / 2),
+    content_dataset, batch_size=int(args.batch_size),
     sampler=InfiniteSamplerWrapper(content_dataset),
     num_workers=args.n_threads))
 style_iter = iter(data.DataLoader(
-    style_dataset, batch_size=int(args.batch_size / 2),
-    # style_dataset, batch_size=int(args.batch_size),
+    # style_dataset, batch_size=int(args.batch_size / 2),
+    style_dataset, batch_size=int(args.batch_size),
     sampler=InfiniteSamplerWrapper(style_dataset),
     num_workers=args.n_threads))
 
@@ -169,32 +176,47 @@ for i in progress_bar:
     ######################################################
 
     # img, loss_c, loss_s, l_identity1, l_identity2, loss_contrastive_c, loss_contrastive_s = network(content_images, style_images, args.batch_size)
-    img, loss_c, loss_s, l_identity1, l_identity2 = network(content_images, style_images, args.batch_size)
+
+    img, rc1, rs1, output2, rc2, rs2, l_identity1, l_identity2, content_transitive_loss, style_transitive_loss, style_diff_loss, content_restoration_loss, style_restoration_loss = network(content_images, style_images, args.batch_size)
 
     # train discriminator
-    loss_gan_d = D.compute_loss(style_images, valid) + D.compute_loss(img.detach(), fake)
+    loss_gan_d = D.compute_loss(style_images, valid) + D.compute_loss(img.detach(), fake) + D.compute_loss(content_images, valid) + D.compute_loss(output2.detach(), fake)
     optimizer_D.zero_grad()
     loss_gan_d.backward()
     optimizer_D.step()
 
     # train generator
-    loss_c = args.content_weight * loss_c
-    loss_s = args.style_weight * loss_s
+    # loss_c = args.content_weight * loss_c
+    # loss_s = args.style_weight * loss_s
 
     # loss_contrastive_c = args.contrastive_weight_c * loss_contrastive_c
     # loss_contrastive_s = args.contrastive_weight_s * loss_contrastive_s
 
 
-    loss_gan_g = args.gan_weight * D.compute_loss(img, valid)
-    loss = loss_c + loss_s + l_identity1 * 50 + l_identity2 * 1 + loss_gan_g
+    content_transitive_loss = args.content_transitive_loss_weight * content_transitive_loss
+    style_transitive_loss = args.style_transitive_loss_weight * style_transitive_loss
+    style_diff_loss = args.style_diff_loss_weight * style_diff_loss
+    content_restoration_loss = args.content_restoration_loss_weight * content_restoration_loss
+    style_restoration_loss = args.style_restoration_loss_weight * style_restoration_loss
+
+
+    loss_gan_g = args.gan_weight * D.compute_loss(img, valid) + args.gan_weight * D.compute_loss(output2, valid)
+    loss = content_transitive_loss + style_transitive_loss + style_diff_loss + content_restoration_loss + style_restoration_loss + l_identity1 * 50 + l_identity2 * 1 + loss_gan_g
     # loss = loss_c + loss_s + l_identity1 * 50 + l_identity2 * 1 + loss_contrastive_c + loss_contrastive_s + loss_gan_g
 
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
 
-    writer.add_scalar('loss_content', loss_c.item(), i + 1)
-    writer.add_scalar('loss_style', loss_s.item(), i + 1)
+    # writer.add_scalar('loss_content', loss_c.item(), i + 1)
+    # writer.add_scalar('loss_style', loss_s.item(), i + 1)
+    writer.add_scalar('content_transitive_loss', content_transitive_loss.item(), i + 1)
+    writer.add_scalar('style_transitive_loss', style_transitive_loss.item(), i + 1)
+    writer.add_scalar('style_diff_loss', style_diff_loss.item(), i + 1)
+    writer.add_scalar('content_restoration_loss', content_restoration_loss.item(), i + 1)
+    writer.add_scalar('style_restoration_loss', style_restoration_loss.item(), i + 1)
+
+
     writer.add_scalar('loss_identity1', l_identity1.item(), i + 1)
     writer.add_scalar('loss_identity2', l_identity2.item(), i + 1)
     # writer.add_scalar('loss_contrastive_c', loss_contrastive_c.item(), i + 1)  # attention
@@ -213,8 +235,13 @@ for i in progress_bar:
 
     # 使用set_postfix方法在进度条后添加损失值
     progress_bar.set_postfix({
-        'Content Loss': '{:.4f}'.format(loss_c),
-        'Style Loss': '{:.4f}'.format(loss_s),
+        # 'Content Loss': '{:.4f}'.format(loss_c),
+        # 'Style Loss': '{:.4f}'.format(loss_s),
+        'content_transitive_loss Loss': '{:.4f}'.format(content_transitive_loss),
+        'style_transitive_loss Loss': '{:.4f}'.format(style_transitive_loss),
+        'style_diff_loss Loss': '{:.4f}'.format(style_diff_loss),
+        'content_restoration_loss Loss': '{:.4f}'.format(content_restoration_loss),
+        'style_restoration_loss Loss': '{:.4f}'.format(style_restoration_loss),
         'Identity1 Loss': '{:.4f}'.format(l_identity1),
         'Identity2 Loss': '{:.4f}'.format(l_identity2),
         'GAN G Loss': '{:.4f}'.format(loss_gan_g),

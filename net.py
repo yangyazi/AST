@@ -706,16 +706,111 @@ class Net(nn.Module):
             self.adaptive_get_keys(content_feats, 4, 4),
             self.adaptive_get_keys(style_feats, 0, 4))
         global_transformed_feat = self.adain(content_feats[3], style_feats[3])
-        stylized = self.featureFusion(local_transformed_feature, global_transformed_feat)
+        stylized1 = self.featureFusion(local_transformed_feature, global_transformed_feat)
 
 
         # stylized = self.transform(content_feats[3], style_feats[3], content_feats[4], style_feats[4])
-        g_t = self.decoder(stylized)
-        g_t_feats = self.encode_with_intermediate(g_t)
-        loss_c = self.calc_content_loss(g_t_feats[3], content_feats[3], norm = True) + self.calc_content_loss(g_t_feats[4], content_feats[4], norm = True)
-        loss_s = self.calc_style_loss(g_t_feats[0], style_feats[0])
+        output1 = self.decoder(stylized1)
+        opt1_feats = self.encode_with_intermediate(output1)
+
+        stylized_rc1 = self.featureFusion(self.transformer(
+            opt1_feats[3], content_feats[3], opt1_feats[4], content_feats[4],
+            self.adaptive_get_keys(opt1_feats, 3, 3),
+            self.adaptive_get_keys(content_feats, 0, 3),
+            self.adaptive_get_keys(opt1_feats, 4, 4),
+            self.adaptive_get_keys(content_feats, 0, 4))[0], self.adain(opt1_feats[3], content_feats[3]))
+        rc1 = self.decoder(stylized_rc1)
+        rc1_feats = self.encode_with_intermediate(rc1)
+
+        stylized_rs1 = self.featureFusion(self.transformer(
+            style_feats[3], opt1_feats[3], style_feats[4], opt1_feats[4],
+            self.adaptive_get_keys(style_feats, 3, 3),
+            self.adaptive_get_keys(opt1_feats, 0, 3),
+            self.adaptive_get_keys(style_feats, 4, 4),
+            self.adaptive_get_keys(opt1_feats, 0, 4))[0], self.adain(style_feats[3], opt1_feats[3]))
+        rs1 = self.decoder(stylized_rs1)
+        rs1_feats = self.encode_with_intermediate(rs1)
+
+        # restoration left
+        stylized2 = self.featureFusion(self.transformer(
+            style_feats[3], content_feats[3], style_feats[4], content_feats[4],
+            self.adaptive_get_keys(style_feats, 3, 3),
+            self.adaptive_get_keys(content_feats, 0, 3),
+            self.adaptive_get_keys(style_feats, 4, 4),
+            self.adaptive_get_keys(content_feats, 0, 4))[0], self.adain(style_feats[3], content_feats[3]))
+        output2 = self.decoder(stylized2)
+        opt2_feats = self.encode_with_intermediate(output2)
+
+        stylized_rc2 = self.featureFusion(self.transformer(
+            content_feats[3], opt2_feats[3], content_feats[4], opt2_feats[4],
+            self.adaptive_get_keys(content_feats, 3, 3),
+            self.adaptive_get_keys(opt2_feats, 0, 3),
+            self.adaptive_get_keys(content_feats, 4, 4),
+            self.adaptive_get_keys(opt2_feats, 0, 4))[0], self.adain(content_feats[3], opt2_feats[3]))
+        rc2 = self.decoder(stylized_rc2)
+        rc2_feats = self.encode_with_intermediate(rc2)
+
+        stylized_rs2 = self.featureFusion(self.transformer(
+            opt2_feats[3], style_feats[3], opt2_feats[4], style_feats[4],
+            self.adaptive_get_keys(opt2_feats, 3, 3),
+            self.adaptive_get_keys(style_feats, 0, 3),
+            self.adaptive_get_keys(opt2_feats, 4, 4),
+            self.adaptive_get_keys(style_feats, 0, 4))[0], self.adain(opt2_feats[3], style_feats[3]))
+        rs2 = self.decoder(stylized_rs2)
+        rs2_feats = self.encode_with_intermediate(rs2)
+
+        # restoration loss functions right
+        content_transitive_loss1 = self.calc_content_loss(rc1_feats[3], content_feats[3],
+                                                          norm=True) + self.calc_content_loss(rc1_feats[4],
+                                                                                              content_feats[4],
+                                                                                              norm=True)
+
+        style_diff_loss1 = self.calc_style_loss(opt1_feats[0], content_feats[0])
         for i in range(1, 5):
-            loss_s += self.calc_style_loss(g_t_feats[i], style_feats[i])
+            style_diff_loss1 += self.calc_style_loss(opt1_feats[i], content_feats[i])
+        style_diff_loss1 = 1 / style_diff_loss1
+
+        style_transitive_loss1 = self.calc_style_loss(rs1_feats[0], style_feats[0])
+        for i in range(1, 5):
+            style_transitive_loss1 += self.calc_style_loss(rs1_feats[i], style_feats[i])
+
+        # restoration loss functions left
+        content_transitive_loss2 = self.calc_content_loss(rs2_feats[3], style_feats[3],
+                                                          norm=True) + self.calc_content_loss(rs2_feats[4],
+                                                                                              style_feats[4], norm=True)
+
+        style_diff_loss2 = self.calc_style_loss(opt2_feats[0], style_feats[0])
+        for i in range(1, 5):
+            style_diff_loss2 += self.calc_style_loss(opt2_feats[i], style_feats[i])
+        style_diff_loss2 = 1 / style_diff_loss2
+
+        style_transitive_loss2 = self.calc_style_loss(rc2_feats[0], content_feats[0])
+        for i in range(1, 5):
+            style_transitive_loss2 += self.calc_style_loss(rc2_feats[i], content_feats[i])
+
+        # restoration loss
+        content_restoration_loss = self.calc_content_loss(rc1_feats[3], rc2_feats[3],
+                                                          norm=True) + self.calc_content_loss(rc1_feats[4],
+                                                                                              rc2_feats[4],
+                                                                                              norm=True) + self.calc_content_loss(
+            rs1_feats[3], rs2_feats[3], norm=True) + self.calc_content_loss(rs1_feats[4], rs2_feats[4], norm=True)
+        style_restoration_loss = self.calc_style_loss(rc1_feats[0], rc2_feats[0])
+        for i in range(1, 5):
+            style_restoration_loss += self.calc_style_loss(rc1_feats[i], rc2_feats[i])
+
+        style_restoration_loss += self.calc_style_loss(rs1_feats[0], rs2_feats[0])
+        for j in range(1, 5):
+            style_restoration_loss += self.calc_style_loss(rs1_feats[j], rs2_feats[j])
+
+        content_transitive_loss = content_transitive_loss1 + content_transitive_loss2
+        style_transitive_loss = style_transitive_loss1 + style_transitive_loss2
+        style_diff_loss = style_diff_loss1 + style_diff_loss2
+
+
+        # loss_c = self.calc_content_loss(opt1_feats[3], content_feats[3], norm = True) + self.calc_content_loss(opt1_feats[4], content_feats[4], norm = True)
+        # loss_s = self.calc_style_loss(opt1_feats[0], style_feats[0])
+        # for i in range(1, 5):
+        #     loss_s += self.calc_style_loss(opt1_feats[i], style_feats[i])
         """IDENTITY LOSSES"""
         # Icc = self.decoder(self.transform(content_feats[3], content_feats[3], content_feats[4], content_feats[4]))
         # Iss = self.decoder(self.transform(style_feats[3], style_feats[3], style_feats[4], style_feats[4]))
@@ -808,4 +903,5 @@ class Net(nn.Module):
         #     content_contrastive_loss += self.compute_contrastive_loss(reference_content, content_comparisons, 0.2, 0)
 
         # return g_t, loss_c, loss_s, l_identity1, l_identity2, content_contrastive_loss, style_contrastive_loss
-        return g_t, loss_c, loss_s, l_identity1, l_identity2
+        # return output1, loss_c, loss_s, l_identity1, l_identity2
+        return output1, rc1, rs1, output2, rc2, rs2, l_identity1, l_identity2, content_transitive_loss, style_transitive_loss, style_diff_loss, content_restoration_loss, style_restoration_loss
