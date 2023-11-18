@@ -45,13 +45,13 @@ parser.add_argument('--style', type=str,
 #                     interpolation or spatial control')
 
 #######
-parser.add_argument('--content_dir', type=str,default = r'E:\00000000000000000\testinput\content1',
+parser.add_argument('--content_dir', type=str,default = r'E:\00000000000000000\testinput\content2',
                     help='Directory path to a batch of content images')
 parser.add_argument('--style_dir', type=str,default = r'E:\00000000000000000\testinput\style1',
                     help='Directory path to a batch of style images')
 #######
 
-parser.add_argument('--steps', type=str, default = 1)
+# parser.add_argument('--steps', type=str, default = 1)
 # parser.add_argument('--vgg', type=str, default = 'model/vgg_normalised.pth')
 # parser.add_argument('--decoder', type=str, default = 'model/decoder_iter_160000.pth')
 # parser.add_argument('--transform', type=str, default = 'model/transformer_iter_160000.pth')

@@ -201,6 +201,12 @@ for i in tqdm(range(args.start_iter, args.max_iter)):
 
     writer.add_scalar('loss_gan_d', loss_gan_d.item(), i + 1)
 
+    # 打印并更新一行中的损失值
+    print("\rStep: {}, Content Loss: {:.4f}, Style Loss: {:.4f}, "
+          "Identity1 Loss: {:.4f}, Identity2 Loss: {:.4f}, "
+          "GAN G Loss: {:.4f}, GAN D Loss: {:.4f}".format(i + 1, loss_c, loss_s, l_identity1, l_identity2,
+                                                          loss_gan_g, loss_gan_d), end='')
+
     ############################################################################
     output_dir = Path(args.sample_path)
     output_dir.mkdir(exist_ok=True, parents=True)
