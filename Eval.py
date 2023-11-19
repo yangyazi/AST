@@ -58,9 +58,9 @@ parser.add_argument('--steps', type=str, default = 1)
 # parser.add_argument('--featureFusion', type=str, default = 'model/featureFusion_iter_160000.pth')
 
 parser.add_argument('--vgg', type=str, default = 'model/vgg_normalised.pth')
-parser.add_argument('--decoder', type=str, default = r'E:\00000000000000000\newnew\IEContraAST002\experiments\decoder_iter_1600.pth')
-parser.add_argument('--transform', type=str, default = r'E:\00000000000000000\newnew\IEContraAST002\experiments\transformer_iter_1600.pth')
-parser.add_argument('--featureFusion', type=str, default = r'E:\00000000000000000\newnew\IEContraAST002\experiments\featureFusion_iter_1600.pth')
+parser.add_argument('--decoder', type=str, default = r'E:\00000000000000000\newnew\IEContraAST003\experiments1\decoder_iter_1600.pth')
+parser.add_argument('--transform', type=str, default = r'E:\00000000000000000\newnew\IEContraAST003\experiments1\transformer_iter_1600.pth')
+parser.add_argument('--featureFusion', type=str, default = r'E:\00000000000000000\newnew\IEContraAST003\experiments1\featureFusion_iter_1600.pth')
 
 # Additional options
 

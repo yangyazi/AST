@@ -765,10 +765,13 @@ class Net(nn.Module):
                                                                                               content_feats[4],
                                                                                               norm=True)
 
-        style_diff_loss1 = self.calc_style_loss(opt1_feats[0], content_feats[0])
+        style_diff_loss1 = self.calc_style_loss(opt1_feats[0], style_feats[0])
         for i in range(1, 5):
-            style_diff_loss1 += self.calc_style_loss(opt1_feats[i], content_feats[i])
-        style_diff_loss1 = 1 / style_diff_loss1
+            style_diff_loss1 += self.calc_style_loss(opt1_feats[i], style_feats[i])
+        # style_diff_loss1 = 1 / style_diff_loss1
+        content_diff_loss1 = self.calc_content_loss(opt1_feats[3], content_feats[3],
+                                                    norm=True) + self.calc_content_loss(opt1_feats[4],
+                                                                                        content_feats[4], norm=True)
 
         style_transitive_loss1 = self.calc_style_loss(rs1_feats[0], style_feats[0])
         for i in range(1, 5):
@@ -779,10 +782,13 @@ class Net(nn.Module):
                                                           norm=True) + self.calc_content_loss(rs2_feats[4],
                                                                                               style_feats[4], norm=True)
 
-        style_diff_loss2 = self.calc_style_loss(opt2_feats[0], style_feats[0])
+        style_diff_loss2 = self.calc_style_loss(opt2_feats[0], content_feats[0])
         for i in range(1, 5):
-            style_diff_loss2 += self.calc_style_loss(opt2_feats[i], style_feats[i])
-        style_diff_loss2 = 1 / style_diff_loss2
+            style_diff_loss2 += self.calc_style_loss(opt2_feats[i], content_feats[i])
+        # style_diff_loss2 = 1 / style_diff_loss2
+        content_diff_loss2 = self.calc_content_loss(opt2_feats[3], style_feats[3],
+                                                          norm=True) + self.calc_content_loss(opt2_feats[4],
+                                                                                              style_feats[4], norm=True)
 
         style_transitive_loss2 = self.calc_style_loss(rc2_feats[0], content_feats[0])
         for i in range(1, 5):
@@ -805,6 +811,7 @@ class Net(nn.Module):
         content_transitive_loss = content_transitive_loss1 + content_transitive_loss2
         style_transitive_loss = style_transitive_loss1 + style_transitive_loss2
         style_diff_loss = style_diff_loss1 + style_diff_loss2
+        content_diff_loss = content_diff_loss1 + content_diff_loss2
 
 
         # loss_c = self.calc_content_loss(opt1_feats[3], content_feats[3], norm = True) + self.calc_content_loss(opt1_feats[4], content_feats[4], norm = True)
@@ -904,4 +911,4 @@ class Net(nn.Module):
 
         # return g_t, loss_c, loss_s, l_identity1, l_identity2, content_contrastive_loss, style_contrastive_loss
         # return output1, loss_c, loss_s, l_identity1, l_identity2
-        return output1, rc1, rs1, output2, rc2, rs2, l_identity1, l_identity2, content_transitive_loss, style_transitive_loss, style_diff_loss, content_restoration_loss, style_restoration_loss
+        return output1, rc1, rs1, output2, rc2, rs2, l_identity1, l_identity2, content_transitive_loss, style_transitive_loss, style_diff_loss, content_diff_loss, content_restoration_loss, style_restoration_loss
