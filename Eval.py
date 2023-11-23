@@ -30,9 +30,9 @@ def test_transform(size, crop):
 parser = argparse.ArgumentParser()
 
 # Basic options
-parser.add_argument('--content', type=str, default = 'input/content/1.jpg',
+parser.add_argument('--content', type=str,
                     help='File path to the content image')
-parser.add_argument('--style', type=str, default = 'input/style/1.jpg',
+parser.add_argument('--style', type=str,
                     help='File path to the style image, or multiple style \
                     images separated by commas if you want to do style \
                     interpolation or spatial control')
